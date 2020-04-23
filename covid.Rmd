@@ -17,21 +17,15 @@ library(tidyverse)
 
 covid_us <- read.csv("covid19_confirmed_US.csv")
 
-
 head(covid_us)
 
-# for each line, do a logistic regression
-
-# Loop
-# 1) Grab a row
-# 2) Clean row of useless cols
-# 3) Get separate dataset containing dates (column) vs cases (column)
-# 4) Create logistic model and get k
+# begin data cleaning
 testResults <- covid_us
 
 #remove unneeded columns
 testResults <- select(testResults,-c(2,3,4,5,6, 8, 11))
 
+#remove entries where no cases have been confirmed
 drops = c()
 for (i in 1:nrow(testResults)) {
   if (testResults$X4.22.20[i] == 0) {
@@ -41,10 +35,11 @@ for (i in 1:nrow(testResults)) {
 
 testResults = testResults[-drops, ]
 
+# regression to the exponential model
+# add growth coefficient k and r squard columns
+testResults <- mutate(testResults, k_exp=0, r_sq_exp=0)
 
-#add growth coefficient k and r squard columns
-testResults <- mutate(testResults, k=0, r_sq=0)
-
+# for each row (location), perform regression and record growth rate (k) and r_squared
 for (row_num in 1:nrow(testResults)) {
   row <- testResults[row_num,]
 
@@ -56,10 +51,11 @@ for (row_num in 1:nrow(testResults)) {
     num_cases = c(num_cases, case_num)
   }
   
+  # compile number of cases vs date
   time_series <- data.frame("date"=as.Date(dates, "X%m.%d.%y"), "num_cases"=num_cases)
   head(time_series)
   
-  # drop rows with 0 cases
+  # again, drop rows with 0 cases
   drops = c()
   for (i in 1:nrow(time_series)) {
     if (time_series$num_cases[i] == 0) {
@@ -71,12 +67,13 @@ for (row_num in 1:nrow(testResults)) {
     time_series = time_series[-drops, ]
   }
   
-  
   if (nrow(time_series) > 0) {
+    # we can do regression to exponential equation by taking the log of the y variable
     exponential_model <- lm(log(num_cases) ~ date, data=time_series)
+    # the growth rate is equivalent to the slope of the linear estimation (math not shown here)
     r_coeff = coefficients(exponential_model)[2]
-    testResults[row_num,]$k = r_coeff
-    testResults[row_num,]$r_sq = summary(exponential_model)$adj.r.squared
+    testResults[row_num,]$k_exp = r_coeff
+    testResults[row_num,]$r_sq_exp = summary(exponential_model)$adj.r.squared
   }
 }
 ```
@@ -85,27 +82,90 @@ for (row_num in 1:nrow(testResults)) {
 
 typeof(testResults$k[0])
 
-ggplot(testResults, aes(y=k, x=Long_)) +
+ggplot(testResults, aes(y=k_exp, x=Long_)) +
   geom_point() +
   labs(x = "Longitude", y = "Growth Rate")
 
 
-ggplot(testResults, aes(y=k, x=Lat)) +
+ggplot(testResults, aes(y=k_exp, x=Lat)) +
   geom_point() +
   labs(x = "Latitude", y = "Growth Rate")
 
 
-ggplot(testResults, aes(x=r_sq)) +
+ggplot(testResults, aes(x=r_sq_exp)) +
   geom_histogram()
  
+```
+
+
+```{r logistic}
+
+# attempt of regression to logistic growth model - THIS CODE RESULTS IN AN ERROR
+#add growth coefficient k and r squard columns
+testResults <- mutate(testResults, k_log=0, r_sq_log=0)
+
+#pick arbitrary location to test
+row <- testResults[22,]
+
+dates <- colnames(row[,5:96])
+num_cases <- c()
+
+for (i in 5:96) {
+  case_num = row[,i]
+  num_cases = c(num_cases, case_num)
+}
+
+time_series <- data.frame("date"=as.Date(dates, "X%m.%d.%y"), "num_cases"=num_cases)
+head(time_series)
+
+# drop rows with 0 cases
+drops = c()
+for (i in 1:nrow(time_series)) {
+  if (time_series$num_cases[i] == 0) {
+     drops = c(drops, i)
+  }
+}
+
+if (length(drops) > 0) {
+  time_series = time_series[-drops, ]
+}
+
+
+#calculate number of dates since first case
+time_series <- mutate(time_series, day_number = 0)
+for (i in 0:nrow(time_series)) {
+  time_series$day_number[i] = i
+}
+
+
+if (nrow(time_series) > 0) {
+  # encapsulate logistic growth model in formula
+  fo = time_series$num_cases ~ (L / (1 + exp(-k * (time_series$day_number)))) #x_0 is always 0
+  # use non-linear model function
+  # the problem with this approach is that the data must already follow a near perfect logistic trend, R can't extrapolate a logistic     growth relationship.
+  exponential_model = nls(fo, start=list(L=10,k = 0.01), data = time_series)
+  summary(exponential_model)
+
+  
+}
+
 
 ```
+
+
+
+
 ```{r weather}
 library(rnoaa)
 
 location = data.frame(id=22, latitude=40, longitude=-100)
 head(location)
-#stations = meteo_nearby_stations(location)
 
-.libPaths()
+
+#ncdc_stations(datasetid='GHCND', locationid='FIPS:12017', stationid='GHCND:USC00084289', token="GKtOhutkkFzWKMkzMcdLISOVcJFypOkk")
+
+#stations = meteo_nearby_stations(location,radius=50, limit=1, year_min)
+
+
+
 ```
