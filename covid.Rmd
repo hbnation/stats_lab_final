@@ -91,6 +91,10 @@ ggplot(testResults, aes(y=k_exp, x=Lat)) +
   geom_point() +
   labs(x = "Latitude", y = "Growth Rate")
 
+ggplot(testResults, aes(y = Lat, x = Long_, color = k_exp)) + 
+  geom_point() + xlim(-125, -67) + ylim(24, 50) + 
+  labs(x = "Longitude", y = "Latitude", color = "Growth Rate (k)")
+
 
 ggplot(testResults, aes(x=r_sq_exp)) +
   geom_histogram()
