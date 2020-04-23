@@ -28,8 +28,22 @@ head(covid_us)
 # 3) Get separate dataset containing dates (column) vs cases (column)
 # 4) Create logistic model and get k
 testResults <- covid_us
+
+#remove unneeded columns
 testResults <- select(testResults,-c(2,3,4,5,6, 8, 11))
-testResults <- mutate(testResults, k=0)
+
+drops = c()
+for (i in 1:nrow(testResults)) {
+  if (testResults$X4.22.20[i] == 0) {
+    drops = c(drops, i)
+  }
+}
+
+testResults = testResults[-drops, ]
+
+
+#add growth coefficient k and r squard columns
+testResults <- mutate(testResults, k=0, r_sq=0)
 
 for (row_num in 1:nrow(testResults)) {
   row <- testResults[row_num,]
@@ -62,6 +76,7 @@ for (row_num in 1:nrow(testResults)) {
     exponential_model <- lm(log(num_cases) ~ date, data=time_series)
     r_coeff = coefficients(exponential_model)[2]
     testResults[row_num,]$k = r_coeff
+    testResults[row_num,]$r_sq = summary(exponential_model)$adj.r.squared
   }
 }
 ```
@@ -79,5 +94,18 @@ ggplot(testResults, aes(y=k, x=Lat)) +
   geom_point() +
   labs(x = "Latitude", y = "Growth Rate")
 
-```
 
+ggplot(testResults, aes(x=r_sq)) +
+  geom_histogram()
+ 
+
+```
+```{r weather}
+library(rnoaa)
+
+location = data.frame(id=22, latitude=40, longitude=-100)
+head(location)
+#stations = meteo_nearby_stations(location)
+
+.libPaths()
+```
