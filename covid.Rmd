@@ -173,9 +173,6 @@ head(county_pop)
 county_check <- testResults
 head(county_check)
 
-data(countyfips)
-head(countyfips)
-
 county_gdp = read.csv("county_gdp.csv")
 county_gdp$GeoFIPS = trimws(as.character(county_gdp$GeoFIPS))
 head(county_gdp)
@@ -186,18 +183,20 @@ for (row_num in 1:nrow(county_check)) {
   cty_name = as.character(county_check$Admin2[row_num])
   state_name = as.character(county_check$Province_State[row_num])
 
-  cty_name = paste(cty_name, "County")
-
+  if (state_name == "Louisiana") {
+    cty_name = paste(cty_name, "Parish")
+  } else {
+    cty_name = paste(cty_name, "County")
+  }
+  
   if (cty_name != "") {
     if (cty_name %in% county_pop$CTYNAME) {
       a = filter(county_pop, STNAME == state_name, CTYNAME == cty_name)
       testResults[row_num,]$pop = a[1,]$POPESTIMATE2019
     }
   }
-
   
   fips = sprintf("%05d", testResults[row_num,]$FIPS)
-  print(fips)
   gdp_df = filter(county_gdp, GeoFIPS == fips)
 
   if (nrow(gdp_df) > 0) {
