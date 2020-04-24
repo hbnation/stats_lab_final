@@ -23,7 +23,7 @@ head(covid_us)
 testResults <- covid_us
 
 #remove unneeded columns
-testResults <- select(testResults,-c(2,3,4,5,6, 8, 11))
+testResults <- select(testResults,-c(2,3,4, 8, 11))
 
 #remove entries where no cases have been confirmed
 drops = c()
@@ -39,22 +39,27 @@ testResults = testResults[-drops, ]
 # add growth coefficient k and r squard columns
 testResults <- mutate(testResults, k_exp=0, r_sq_exp=0)
 
+head(testResults)
+
+day_start = 7
+day_end = 98
+
 # for each row (location), perform regression and record growth rate (k) and r_squared
 for (row_num in 1:nrow(testResults)) {
   row <- testResults[row_num,]
 
-  dates <- colnames(row[,5:96])
+  dates <- colnames(row[,day_start:day_end])
   num_cases <- c()
-  
-  for (i in 5:96) {
+
+  for (i in day_start:day_end) {
     case_num = row[,i]
     num_cases = c(num_cases, case_num)
   }
-  
+
   # compile number of cases vs date
   time_series <- data.frame("date"=as.Date(dates, "X%m.%d.%y"), "num_cases"=num_cases)
   head(time_series)
-  
+
   # again, drop rows with 0 cases
   drops = c()
   for (i in 1:nrow(time_series)) {
@@ -62,11 +67,11 @@ for (row_num in 1:nrow(testResults)) {
        drops = c(drops, i)
     }
   }
-  
+
   if (length(drops) > 0) {
     time_series = time_series[-drops, ]
   }
-  
+
   if (nrow(time_series) > 0) {
     # we can do regression to exponential equation by taking the log of the y variable
     exponential_model <- lm(log(num_cases) ~ date, data=time_series)
@@ -79,8 +84,6 @@ for (row_num in 1:nrow(testResults)) {
 ```
 
 ```{r plots}
-
-typeof(testResults$k[0])
 
 ggplot(testResults, aes(y=k_exp, x=Long_)) +
   geom_point() +
@@ -104,54 +107,54 @@ ggplot(testResults, aes(x=r_sq_exp)) +
 
 ```{r logistic}
 
-# attempt of regression to logistic growth model - THIS CODE RESULTS IN AN ERROR
-#add growth coefficient k and r squard columns
-testResults <- mutate(testResults, k_log=0, r_sq_log=0)
-
-#pick arbitrary location to test
-row <- testResults[22,]
-
-dates <- colnames(row[,5:96])
-num_cases <- c()
-
-for (i in 5:96) {
-  case_num = row[,i]
-  num_cases = c(num_cases, case_num)
-}
-
-time_series <- data.frame("date"=as.Date(dates, "X%m.%d.%y"), "num_cases"=num_cases)
-head(time_series)
-
-# drop rows with 0 cases
-drops = c()
-for (i in 1:nrow(time_series)) {
-  if (time_series$num_cases[i] == 0) {
-     drops = c(drops, i)
-  }
-}
-
-if (length(drops) > 0) {
-  time_series = time_series[-drops, ]
-}
-
-
-#calculate number of dates since first case
-time_series <- mutate(time_series, day_number = 0)
-for (i in 0:nrow(time_series)) {
-  time_series$day_number[i] = i
-}
-
-
-if (nrow(time_series) > 0) {
-  # encapsulate logistic growth model in formula
-  fo = time_series$num_cases ~ (L / (1 + exp(-k * (time_series$day_number)))) #x_0 is always 0
-  # use non-linear model function
-  # the problem with this approach is that the data must already follow a near perfect logistic trend, R can't extrapolate a logistic     growth relationship.
-  exponential_model = nls(fo, start=list(L=10,k = 0.01), data = time_series)
-  summary(exponential_model)
-
-  
-}
+# # attempt of regression to logistic growth model - THIS CODE RESULTS IN AN ERROR
+# #add growth coefficient k and r squard columns
+# testResults <- mutate(testResults, k_log=0, r_sq_log=0)
+# 
+# #pick arbitrary location to test
+# row <- testResults[22,]
+# 
+# dates <- colnames(row[,7:98])
+# num_cases <- c()
+# 
+# for (i in 7:98) {
+#   case_num = row[,i]
+#   num_cases = c(num_cases, case_num)
+# }
+# 
+# time_series <- data.frame("date"=as.Date(dates, "X%m.%d.%y"), "num_cases"=num_cases)
+# head(time_series)
+# 
+# # drop rows with 0 cases
+# drops = c()
+# for (i in 1:nrow(time_series)) {
+#   if (time_series$num_cases[i] == 0) {
+#      drops = c(drops, i)
+#   }
+# }
+# 
+# if (length(drops) > 0) {
+#   time_series = time_series[-drops, ]
+# }
+# 
+# 
+# #calculate number of dates since first case
+# time_series <- mutate(time_series, day_number = 0)
+# for (i in 0:nrow(time_series)) {
+#   time_series$day_number[i] = i
+# }
+# 
+# 
+# if (nrow(time_series) > 0) {
+#   # encapsulate logistic growth model in formula
+#   fo = time_series$num_cases ~ (L / (1 + exp(-k * (time_series$day_number)))) #x_0 is always 0
+#   # use non-linear model function
+#   # the problem with this approach is that the data must already follow a near perfect logistic trend, R can't extrapolate a logistic     growth relationship.
+#   exponential_model = nls(fo, start=list(L=10,k = 0.01), data = time_series)
+#   summary(exponential_model)
+# 
+#   
+# }
 
 
 ```
@@ -159,17 +162,90 @@ if (nrow(time_series) > 0) {
 
 
 
-```{r weather}
-library(rnoaa)
+```{r census}
+library(UScensus2010)
 
-location = data.frame(id=22, latitude=40, longitude=-100)
-head(location)
+head(testResults)
 
+county_pop <- read.csv("county_pop.csv")
+head(county_pop)
 
-#ncdc_stations(datasetid='GHCND', locationid='FIPS:12017', stationid='GHCND:USC00084289', token="GKtOhutkkFzWKMkzMcdLISOVcJFypOkk")
+county_check <- testResults
+head(county_check)
 
-#stations = meteo_nearby_stations(location,radius=50, limit=1, year_min)
+data(countyfips)
+head(countyfips)
 
+county_gdp = read.csv("county_gdp.csv")
+county_gdp$GeoFIPS = trimws(as.character(county_gdp$GeoFIPS))
+head(county_gdp)
 
+testResults <- mutate(testResults, pop=0, rgdp=0)
+
+for (row_num in 1:nrow(county_check)) {
+  cty_name = as.character(county_check$Admin2[row_num])
+  state_name = as.character(county_check$Province_State[row_num])
+
+  cty_name = paste(cty_name, "County")
+
+  if (cty_name != "") {
+    if (cty_name %in% county_pop$CTYNAME) {
+      a = filter(county_pop, STNAME == state_name, CTYNAME == cty_name)
+      testResults[row_num,]$pop = a[1,]$POPESTIMATE2019
+    }
+  }
+
+  
+  fips = sprintf("%05d", testResults[row_num,]$FIPS)
+  print(fips)
+  gdp_df = filter(county_gdp, GeoFIPS == fips)
+
+  if (nrow(gdp_df) > 0) {
+    gdp_raw = gdp_df[which(gdp_df$LineCode == 1), ncol(gdp_df)]
+    gdp = as.numeric(as.character(gdp_raw))
+    testResults[row_num,]$rgdp = gdp
+  }
+}
+
+drops = c()
+for (i in 1:nrow(testResults)) {
+  if (is.na(testResults$pop[i])
+      || is.na(testResults$rgdp[i])
+      ||testResults$pop[i] == 0
+      || testResults$rgdp[i] == 0) {
+    drops = c(drops, i)
+  }
+}
+
+testResults = testResults[-drops, ]
+
+head(testResults)
+```
+
+```{r pop_plot}
+ggplot(testResults, aes(y = Lat, x = Long_, color = pop)) +
+  geom_point() + xlim(-125, -67) + ylim(24, 50) + 
+  labs(x = "Longitude", y = "Latitude", color = "Population")
+
+ggplot(testResults, aes(x = pop, y = k_exp)) +
+  geom_point() +
+  labs(x = "Population", y = "Growth Rate")
+```
+```{r gdp}
+ggplot(testResults, aes(x = pop, y = rgdp)) +
+  geom_point() +
+  labs(x = "Population", y = "Real GDP")
+
+ggplot(testResults, aes(y = Lat, x = Long_, color = rgdp)) +
+  geom_point() + xlim(-125, -67) + ylim(24, 50) +
+  labs(x = "Longitude", y = "Latitude", color = "Real GDP")
+
+ggplot(testResults, aes(x = rgdp, y = k_exp, color = pop)) +
+  geom_point() +
+  labs(x = "Real GDP", y = "Growth Rate")
+
+ggplot(testResults, aes(y = Lat, x = Long_, color = k_exp, alpha=pop)) +
+  geom_point() + xlim(-125, -67) + ylim(24, 50) +
+  labs(x = "Longitude", y = "Latitude", color = "Real GDP")
 
 ```
